@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Sólido de revolución · f(x)=2x, g(x)=x²</title>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
+<style>
+  :root{
+    --bg:#0b1220; --bg2:#0f1a2e; --panel:rgba(15,26,46,.72); --border:rgba(255,255,255,.10);
+    --ink:#eaf0fb; --ink-dim:#9fb0cc; --accent-f:#f4a261; --accent-g:#2fb8a6; --accent-solid:#5b8def;
+    --mono:'SFMono-Regular',Consolas,'Liberation Mono',Menlo,monospace;
+  }
+  :root:not([data-theme="light"]){ }
+  @media (prefers-color-scheme: light){
+    :root:not([data-theme="dark"]){
+      --bg:#f3f5fa; --bg2:#e8ecf6; --panel:rgba(255,255,255,.85); --border:rgba(20,30,50,.12);
+      --ink:#121826; --ink-dim:#54617a;
+    }
+  }
+  :root[data-theme="light"]{
+    --bg:#f3f5fa; --bg2:#e8ecf6; --panel:rgba(255,255,255,.85); --border:rgba(20,30,50,.12);
+    --ink:#121826; --ink-dim:#54617a;
+  }
+  *{box-sizing:border-box;}
+  html,body{height:100%;margin:0;}
+  body{
+    font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+    background:
+      radial-gradient(ellipse at 20% 0%, var(--bg2), transparent 60%),
+      var(--bg);
+    color:var(--ink);
+    overflow:hidden;
+    padding-top:env(safe-area-inset-top,0px);
+    padding-bottom:env(safe-area-inset-bottom,0px);
+  }
+  #scene{position:fixed;inset:0;}
+  header{
+    position:fixed; top:0; left:0; right:0;
+    padding:calc(env(safe-area-inset-top,0px) + 16px) 20px 12px;
+    pointer-events:none;
+  }
+  h1{
+    margin:0 0 4px; font-size:17px; font-weight:600; letter-spacing:.01em;
+  }
+  h1 .f{color:var(--accent-f);} h1 .g{color:var(--accent-g);}
+  p.sub{margin:0; font-size:13px; color:var(--ink-dim); max-width:480px; line-height:1.45;}
+
+  #panel{
+    position:fixed; left:20px; bottom:calc(env(safe-area-inset-bottom,0px) + 20px);
+    background:var(--panel); border:1px solid var(--border); backdrop-filter:blur(10px);
+    border-radius:14px; padding:14px 16px; width:230px;
+    font-size:12.5px; color:var(--ink-dim); line-height:1.6;
+  }
+  #panel strong{color:var(--ink); font-weight:600;}
+  #panel .row{display:flex; justify-content:space-between; gap:10px; margin-top:2px;}
+  #panel .swatch{display:inline-block; width:9px; height:9px; border-radius:2px; margin-right:6px; vertical-align:1px;}
+
+  #controls{
+    position:fixed; right:20px; bottom:calc(env(safe-area-inset-bottom,0px) + 20px);
+    display:flex; flex-direction:column; gap:8px; align-items:flex-end;
+  }
+  button{
+    font-family:inherit; font-size:12.5px; font-weight:600; letter-spacing:.01em;
+    background:var(--panel); color:var(--ink); border:1px solid var(--border);
+    padding:9px 14px; border-radius:10px; cursor:pointer; backdrop-filter:blur(10px);
+    transition:transform .15s ease, border-color .15s ease;
+  }
+  button:hover{border-color:var(--accent-solid); transform:translateY(-1px);}
+  button:active{transform:translateY(0);}
+
+  #progress-wrap{
+    position:fixed; top:calc(env(safe-area-inset-top,0px) + 74px); left:20px; right:20px;
+    max-width:360px; pointer-events:none;
+  }
+  #progress-track{ height:3px; background:var(--border); border-radius:3px; overflow:hidden;}
+  #progress-fill{ height:100%; width:0%; background:linear-gradient(90deg,var(--accent-f),var(--accent-solid)); }
+  #progress-label{ margin-top:6px; font-size:11px; color:var(--ink-dim); font-family:var(--mono); }
+
+  #hint{
+    position:fixed; top:calc(env(safe-area-inset-top,0px) + 16px); right:20px;
+    font-size:11px; color:var(--ink-dim); text-align:right; pointer-events:none;
+  }
+</style>
+</head>
+<body>
+
+<div id="scene"></div>
+
+<header>
+  <h1>Sólido de revolución &nbsp;—&nbsp; <span class="f">f(x)=2x</span> &nbsp;/&nbsp; <span class="g">g(x)=x²</span></h1>
+  <p class="sub">La región entre las curvas, para x∈[0,2], gira alrededor del eje Y hasta barrer 360° y formar el sólido.</p>
+</header>
+
+<div id="hint">arrastra para orbitar · rueda para zoom</div>
+
+<div id="progress-wrap">
+  <div id="progress-track"><div id="progress-fill"></div></div>
+  <div id="progress-label">θ = 0°</div>
+</div>
+
+<div id="panel">
+  <div><span class="swatch" style="background:var(--accent-f)"></span><strong>f(x) = 2x</strong> — curva superior</div>
+  <div><span class="swatch" style="background:var(--accent-g)"></span><strong>g(x) = x²</strong> — curva inferior</div>
+  <div class="row"><span>Volumen (capas cilíndricas)</span></div>
+  <div style="font-family:var(--mono); color:var(--ink); margin-top:2px;">
+    V = 2π∫₀² x(2x−x²)dx = 8π/3
+  </div>
+</div>
+
+<div id="controls">
+  <button id="btn-restart">↺ Reiniciar barrido</button>
+  <button id="btn-speed">Velocidad: 1×</button>
+</div>
+
+<script>
+(function(){
+  const mount = document.getElementById('scene');
+  const scene = new THREE.Scene();
+
+  const isLightBase = window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches;
+  function bgColor(){ return isLightBase ? 0xf3f5fa : 0x0b1220; }
+  scene.background = new THREE.Color(bgColor());
+  scene.fog = new THREE.Fog(bgColor(), 14, 30);
+
+  const camera = new THREE.PerspectiveCamera(45, innerWidth/innerHeight, 0.1, 100);
+  let camDist = 11, camTheta = 0.9, camPhi = 1.15; // orbit spherical coords
+  function updateCamera(){
+    camera.position.set(
+      camDist*Math.sin(camPhi)*Math.sin(camTheta),
+      camDist*Math.cos(camPhi),
+      camDist*Math.sin(camPhi)*Math.cos(camTheta)
+    );
+    camera.lookAt(0, 2, 0);
+  }
+  updateCamera();
+
+  const renderer = new THREE.WebGLRenderer({antialias:true, alpha:false});
+  renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+  renderer.setSize(innerWidth, innerHeight);
+  mount.appendChild(renderer.domElement);
+
+  // lights
+  scene.add(new THREE.AmbientLight(0xffffff, 0.55));
+  const key = new THREE.DirectionalLight(0xffffff, 0.9);
+  key.position.set(5, 8, 6);
+  scene.add(key);
+  const rim = new THREE.DirectionalLight(0x5b8def, 0.4);
+  rim.position.set(-6, 3, -4);
+  scene.add(rim);
+
+  // ---- geometry helpers ----
+  const N = 48;
+  // profile points tracing the boundary of the region: up along f, back along g
+  const profile = [];
+  for(let i=0;i<=N;i++){ const x = 2*i/N; profile.push(new THREE.Vector2(Math.max(x,0.0001), 2*x)); }
+  for(let i=N;i>=0;i--){ const x = 2*i/N; profile.push(new THREE.Vector2(Math.max(x,0.0001), x*x)); }
+
+  // flat 2D region (Shape) for the "before rotation" reference and the moving trailing face
+  const shape = new THREE.Shape();
+  shape.moveTo(profile[0].x, profile[0].y);
+  for(let i=1;i<profile.length;i++) shape.lineTo(profile[i].x, profile[i].y);
+  shape.closePath();
+  const flatGeo = new THREE.ShapeGeometry(shape);
+
+  const flatMat = new THREE.MeshBasicMaterial({
+    color: 0xf4a261, transparent:true, opacity:0.55, side:THREE.DoubleSide, depthWrite:false
+  });
+
+  // reference: the region at its starting position (kept faint throughout)
+  const flatRef = new THREE.Mesh(flatGeo, new THREE.MeshBasicMaterial({
+    color:0xf4a261, transparent:true, opacity:0.28, side:THREE.DoubleSide, depthWrite:false
+  }));
+  scene.add(flatRef);
+
+  // trailing face: marks the current leading edge of the sweep
+  const flatTrail = new THREE.Mesh(flatGeo, flatMat);
+  scene.add(flatTrail);
+
+  // curve outlines on the reference face, for clarity
+  function curveLine(fn, color){
+    const pts = [];
+    for(let i=0;i<=N;i++){ const x=2*i/N; pts.push(new THREE.Vector3(x, fn(x), 0)); }
+    const geo = new THREE.BufferGeometry().setFromPoints(pts);
+    return new THREE.Line(geo, new THREE.LineBasicMaterial({color:color}));
+  }
+  scene.add(curveLine(x=>2*x, 0xf4a261));
+  scene.add(curveLine(x=>x*x, 0x2fb8a6));
+
+  // the revolved solid, rebuilt each frame with growing phiLength
+  const solidMat = new THREE.MeshPhongMaterial({
+    color:0x5b8def, transparent:true, opacity:0.82, shininess:60,
+    side:THREE.DoubleSide, flatShading:false
+  });
+  const wireMat = new THREE.MeshBasicMaterial({color:0x9fb0cc, wireframe:true, transparent:true, opacity:0.12});
+  let solidMesh = null, wireMesh = null;
+  function rebuildSolid(phiLength){
+    if(solidMesh){ scene.remove(solidMesh); solidMesh.geometry.dispose(); }
+    if(wireMesh){ scene.remove(wireMesh); wireMesh.geometry.dispose(); }
+    const geo = new THREE.LatheGeometry(profile, 72, 0, Math.max(phiLength, 0.001));
+    solidMesh = new THREE.Mesh(geo, solidMat);
+    wireMesh = new THREE.Mesh(geo, wireMat);
+    scene.add(solidMesh);
+    scene.add(wireMesh);
+  }
+  rebuildSolid(0.001);
+
+  // axes
+  function axisLine(dir, color, len){
+    const pts=[dir.clone().multiplyScalar(-len*0.15), dir.clone().multiplyScalar(len)];
+    const geo = new THREE.BufferGeometry().setFromPoints(pts);
+    return new THREE.Line(geo, new THREE.LineBasicMaterial({color, transparent:true, opacity:0.5}));
+  }
+  scene.add(axisLine(new THREE.Vector3(1,0,0), 0x9fb0cc, 4.5));
+  scene.add(axisLine(new THREE.Vector3(0,1,0), 0x9fb0cc, 5.5));
+  scene.add(axisLine(new THREE.Vector3(0,0,1), 0x9fb0cc, 4.5));
+
+  function makeLabel(text, color){
+    const c = document.createElement('canvas'); c.width=128; c.height=64;
+    const ctx = c.getContext('2d');
+    ctx.font = '600 40px -apple-system, sans-serif';
+    ctx.fillStyle = color; ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.fillText(text, 64, 32);
+    const tex = new THREE.CanvasTexture(c);
+    const mat = new THREE.SpriteMaterial({map:tex, transparent:true});
+    const spr = new THREE.Sprite(mat);
+    spr.scale.set(0.9, 0.45, 1);
+    return spr;
+  }
+  const labelX = makeLabel('X', '#eaf0fb'); labelX.position.set(4.9, 0, 0); scene.add(labelX);
+  const labelY = makeLabel('Y', '#eaf0fb'); labelY.position.set(0, 6.0, 0); scene.add(labelY);
+  const labelZ = makeLabel('Z', '#eaf0fb'); labelZ.position.set(0, 0, 4.9); scene.add(labelZ);
+
+  // ground grid (faint), on XZ plane at y=0
+  const grid = new THREE.GridHelper(10, 20, 0x2a3550, 0x1a2338);
+  grid.material.transparent = true; grid.material.opacity = 0.35;
+  scene.add(grid);
+
+  // ---- animation state ----
+  let speedMult = 1;
+  const DURATION = 5200; // ms for one full 360° sweep at 1x
+  let startTime = performance.now();
+  let running = true;
+
+  const progressFill = document.getElementById('progress-fill');
+  const progressLabel = document.getElementById('progress-label');
+
+  function restart(){
+    startTime = performance.now();
+    running = true;
+  }
+  document.getElementById('btn-restart').addEventListener('click', restart);
+
+  const speeds = [1, 2, 0.5];
+  let speedIdx = 0;
+  document.getElementById('btn-speed').addEventListener('click', (e)=>{
+    speedIdx = (speedIdx+1) % speeds.length;
+    speedMult = speeds[speedIdx];
+    e.target.textContent = 'Velocidad: ' + speedMult + '×';
+  });
+
+  function animate(now){
+    requestAnimationFrame(animate);
+
+    if(running){
+      const elapsed = (now - startTime) * speedMult;
+      let phi = (elapsed / DURATION) * Math.PI * 2;
+      if(phi >= Math.PI*2){ phi = Math.PI*2; running = false; }
+      rebuildSolid(phi);
+      flatTrail.rotation.y = phi;
+      flatTrail.visible = phi < Math.PI*2 - 0.01;
+
+      const pct = Math.min(100, (phi/(Math.PI*2))*100);
+      progressFill.style.width = pct.toFixed(1)+'%';
+      progressLabel.textContent = 'θ = ' + (phi*180/Math.PI).toFixed(0) + '°';
+    }
+
+    renderer.render(scene, camera);
+  }
+  requestAnimationFrame(animate);
+
+  // ---- manual orbit controls (drag + wheel) ----
+  let dragging=false, lastX=0, lastY=0;
+  const dom = renderer.domElement;
+  dom.style.touchAction = 'none';
+  dom.addEventListener('pointerdown', e=>{ dragging=true; lastX=e.clientX; lastY=e.clientY; dom.setPointerCapture(e.pointerId); });
+  dom.addEventListener('pointerup', ()=>{ dragging=false; });
+  dom.addEventListener('pointercancel', ()=>{ dragging=false; });
+  dom.addEventListener('pointermove', e=>{
+    if(!dragging) return;
+    const dx = e.clientX - lastX, dy = e.clientY - lastY;
+    lastX = e.clientX; lastY = e.clientY;
+    camTheta -= dx * 0.006;
+    camPhi = Math.min(Math.max(camPhi - dy*0.006, 0.25), Math.PI-0.25);
+    updateCamera();
+  });
+  dom.addEventListener('wheel', e=>{
+    e.preventDefault();
+    camDist = Math.min(Math.max(camDist + e.deltaY*0.01, 5), 22);
+    updateCamera();
+  }, {passive:false});
+
+  window.addEventListener('resize', ()=>{
+    camera.aspect = innerWidth/innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(innerWidth, innerHeight);
+  });
+})();
+</script>
+</body>
+</html>
